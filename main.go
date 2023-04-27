@@ -37,7 +37,10 @@ func main() {
 	// Generate brown noise and play it back
 	for {
 		generateBrownNoise(privateRand, b)
-		player.Write(b)
+		_, err := player.Write(b)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
