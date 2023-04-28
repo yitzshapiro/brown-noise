@@ -79,6 +79,44 @@ func TestOtoContextAndPlayer(t *testing.T) {
 	}
 }
 
+func BenchmarkGenerateBrownNoise(b *testing.B) {
+	seed := time.Now().UnixNano()
+	privateRand := rand.New(rand.NewSource(seed))
+
+	alpha := 0.01
+	buffer := make([]byte, bufferSizeInBytes)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		generateBrownNoise(privateRand, buffer, alpha)
+	}
+}
+
+func BenchmarkFullLoop(b *testing.B) {
+	seed := time.Now().UnixNano()
+	privateRand := rand.New(rand.NewSource(seed))
+
+	context, err := oto.NewContext(sampleRate, channelNum, bitDepthInBytes, bufferSizeInBytes)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer context.Close()
+
+	player := context.NewPlayer()
+	defer player.Close()
+
+	buffer := make([]byte, bufferSizeInBytes)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		generateBrownNoise(privateRand, buffer, 0.01)
+		_, err := player.Write(buffer)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 // HELPERS
 
 // Helper function to calculate the average and standard deviation sample values
