@@ -109,6 +109,29 @@ Compared to playing a pre-recorded brown noise MP3 or WAV file, the real-time ge
 - No need for large audio files or continuous looping
 - Customizable noise depth through the `alpha` parameter
 
+### Benchmarking
+
+The performance of the brown noise generator was measured using Go's built-in benchmarking functionality on a machine with the following specifications:
+
+- OS: macOS (darwin)
+- Architecture: amd64
+- CPU: Intel(R) Core(TM) i9-9980HK CPU @ 2.40GHz
+
+The benchmark results for the `generateBrownNoise` function are:
+
+```bash
+BenchmarkGenerateBrownNoise-16 2323 443095 ns/op
+BenchmarkFullLoop-16 1 2042681545 ns/op
+```
+
+For the `generateBrownNoise` function, it takes approximately 443,095 nanoseconds (around 0.443 milliseconds) to generate a single buffer of brown noise.
+
+The full loop, including Oto library functions, takes approximately 2,042,681,545 nanoseconds (around 2.043 seconds) per iteration.
+
+Keep in mind that performance may vary depending on the hardware and system load.
+
+It's recommended to run the benchmark multiple times and in different conditions to obtain a more accurate and consistent assessment of the performance.
+
 ## Contributing
 
 Contributions are welcome! If you have suggestions for improvements, bug reports, or new features, please create an issue or submit a pull request on GitHub.
