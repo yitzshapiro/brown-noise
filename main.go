@@ -36,7 +36,7 @@ func main() {
 
 	// Generate brown noise and play it back
 	for {
-		generateBrownNoise(privateRand, b)
+		generateBrownNoise(privateRand, b, 0.01)
 		_, err := player.Write(b)
 		if err != nil {
 			panic(err)
@@ -44,10 +44,8 @@ func main() {
 	}
 }
 
-func generateBrownNoise(r *rand.Rand, buffer []byte) {
+func generateBrownNoise(r *rand.Rand, buffer []byte, alpha float64) {
 	var lastSample float64
-
-	alpha := 0.01 // The lower the value, the deeper the noise
 
 	for i := 0; i < len(buffer); i += bytesPerSample {
 		// Generate a random number between -1 and 1
