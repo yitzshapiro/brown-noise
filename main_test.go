@@ -20,7 +20,7 @@ import (
 
 func TestMain(m *testing.M) {
 	// OPTIONAL: Enable CPU profiling
-	// Comment out if you don't want an always-on CPU profiling.
+	// Comment out if you don't want always-on CPU profiling.
 	// To run with CPU profiling: go test -bench=. -run=^$ -cpuprofile=cpu.prof
 	// and then analyze with: go tool pprof cpu.prof
 	f, err := os.Create("cpu.prof")
@@ -28,6 +28,7 @@ func TestMain(m *testing.M) {
 		log.Fatal("could not create CPU profile: ", err)
 	}
 	pprof.StartCPUProfile(f)
+	defer f.Close()
 	code := m.Run()
 	pprof.StopCPUProfile()
 	os.Exit(code)
@@ -50,7 +51,7 @@ func TestGenerateBrownNoiseAlphaValues(t *testing.T) {
 
 	for _, alpha := range alphas {
 		t.Run(fmt.Sprintf("alpha=%.3f", alpha), func(t *testing.T) {
-			generateBrownNoise(r, buffer, alpha)
+			generateBrownNoise(r, buffer, alpha, 0, 1)
 
 			// Calculate average, stddev, min/max, zero-crossing
 			avg, stddev := calculateAverageAndStdDev(buffer)
@@ -86,7 +87,7 @@ func TestGenerateBrownNoiseOutputRange(t *testing.T) {
 	bufferSizeInBytes := framesPerBuffer * channelNum * bitDepthInBytes
 	buffer := make([]byte, bufferSizeInBytes)
 
-	generateBrownNoise(r, buffer, 0.01)
+	generateBrownNoise(r, buffer, 0.01, 0, 1)
 
 	bytesPerSample := channelNum * bitDepthInBytes
 	for i := 0; i < len(buffer); i += bytesPerSample {
@@ -137,7 +138,7 @@ func TestBrownNoiseContinuity(t *testing.T) {
 	alpha := 0.01
 
 	// Generate first buffer
-	generateBrownNoise(r, buf1, alpha)
+	generateBrownNoise(r, buf1, alpha, 0, 1)
 	// Grab the last sample from buf1 (left channel)
 	bytesPerSample := channelNum * bitDepthInBytes
 	lastSampleBuf1 := int16(binary.LittleEndian.Uint16(
@@ -145,7 +146,7 @@ func TestBrownNoiseContinuity(t *testing.T) {
 	))
 
 	// Generate second buffer
-	generateBrownNoise(r, buf2, alpha)
+	generateBrownNoise(r, buf2, alpha, 0, 1)
 	firstSampleBuf2 := int16(binary.LittleEndian.Uint16(buf2[0:2]))
 
 	// They won't be identical, but if the noise is continuous, they should be close.
@@ -174,7 +175,7 @@ func TestNoExcessiveDCDrift(t *testing.T) {
 
 	const numBuffers = 10
 	for i := 0; i < numBuffers; i++ {
-		generateBrownNoise(r, buffer, alpha)
+		generateBrownNoise(r, buffer, alpha, 0, 1)
 		bSum, _ := sumAndSqSum(buffer)
 		sum += bSum
 		totalSamples += len(buffer) / (channelNum * bitDepthInBytes)
@@ -207,7 +208,7 @@ func TestConcurrentGeneration(t *testing.T) {
 			buf := make([]byte, bufferSizeInBytes)
 
 			for i := 0; i < iterations; i++ {
-				generateBrownNoise(r, buf, 0.01)
+				generateBrownNoise(r, buf, 0.01, 0, 1)
 
 				bytesPerSample := channelNum * bitDepthInBytes
 				for i := 0; i < len(buf); i += bytesPerSample {
@@ -246,7 +247,7 @@ func BenchmarkGenerateBrownNoise(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		generateBrownNoise(privateRand, buffer, alpha)
+		generateBrownNoise(privateRand, buffer, alpha, 0, 1)
 	}
 }
 
@@ -271,7 +272,7 @@ func BenchmarkFullLoop(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		generateBrownNoise(privateRand, buffer, 0.01)
+		generateBrownNoise(privateRand, buffer, 0.01, 0, 1)
 		_, err := player.Write(buffer)
 		if err != nil {
 			b.Fatal(err)

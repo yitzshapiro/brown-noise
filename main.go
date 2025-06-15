@@ -2,8 +2,14 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/hajimehoshi/oto"
+	"log"
+	"math"
 	"math/rand"
+	"net/http"
+	"strconv"
+	"sync/atomic"
 	"time"
 )
 
@@ -22,9 +28,22 @@ const (
 // brown noise remains continuous across buffers.
 var lastSample float64
 
+var alphaVal atomic.Value
+var pitchVal atomic.Value
+var volumeVal atomic.Value
+var tonePhase float64
+
+func init() {
+	alphaVal.Store(0.01)
+	pitchVal.Store(0.0)
+	volumeVal.Store(1.0)
+}
+
 func main() {
 	seed := time.Now().UnixNano()
 	privateRand := rand.New(rand.NewSource(seed))
+
+	go startServer()
 
 	framesPerBuffer := int(float64(sampleRate) * bufferDuration.Seconds())
 	bufferSizeInBytes := framesPerBuffer * channelNum * bitDepthInBytes
@@ -56,7 +75,10 @@ func main() {
 	go func() {
 		for {
 			buf := <-bufferPool // get an empty buffer
-			generateBrownNoise(privateRand, buf, 0.01)
+			a := alphaVal.Load().(float64)
+			p := pitchVal.Load().(float64)
+			v := volumeVal.Load().(float64)
+			generateBrownNoise(privateRand, buf, a, p, v)
 			audioCh <- buf // send the filled buffer for playback
 		}
 	}()
@@ -74,15 +96,56 @@ func main() {
 
 // generateBrownNoise fills `buffer` with brown noise samples.
 // Using a single 32-bit write for both stereo channels.
-func generateBrownNoise(r *rand.Rand, buffer []byte, alpha float64) {
+func generateBrownNoise(r *rand.Rand, buffer []byte, alpha, pitch, vol float64) {
 	for i := 0; i < len(buffer); i += 4 {
 		randomSample := 2*r.Float64() - 1
 
 		lastSample = alpha*randomSample + (1-alpha)*lastSample
+		sample := lastSample
+		if pitch > 0 {
+			sample += math.Sin(2 * math.Pi * pitch * tonePhase / float64(sampleRate))
+		}
+		tonePhase++
 
-		s := int16(lastSample * 32767)
+		s := int16(sample * 32767 * vol)
 
 		u := uint32(s) & 0xFFFF
 		binary.LittleEndian.PutUint32(buffer[i:i+4], (u<<16)|u)
 	}
+}
+
+func startServer() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err == nil {
+			if v := r.FormValue("alpha"); v != "" {
+				if val, err := strconv.ParseFloat(v, 64); err == nil {
+					alphaVal.Store(val)
+				}
+			}
+			if v := r.FormValue("pitch"); v != "" {
+				if val, err := strconv.ParseFloat(v, 64); err == nil {
+					pitchVal.Store(val)
+				}
+			}
+			if v := r.FormValue("volume"); v != "" {
+				if val, err := strconv.ParseFloat(v, 64); err == nil {
+					volumeVal.Store(val)
+				}
+			}
+		}
+
+		a := alphaVal.Load().(float64)
+		p := pitchVal.Load().(float64)
+		v := volumeVal.Load().(float64)
+		fmt.Fprintf(w, `<html><body>
+<form method="POST">
+Alpha: <input name="alpha" value="%.3f"><br>
+Pitch (Hz): <input name="pitch" value="%.2f"><br>
+Volume: <input name="volume" value="%.2f"><br>
+<input type="submit" value="Update">
+</form>
+</body></html>`, a, p, v)
+	})
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
