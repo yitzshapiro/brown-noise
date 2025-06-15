@@ -25,7 +25,7 @@ git clone https://github.com/ulsc/brown-noise.git
 cd brown-noise
 ```
 
-4. Build the Go application:
+3. Build the Go application:
 
 ```bash
 go build -o brown_noise main.go
